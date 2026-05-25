@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jeremia Center - Tactical Monitor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'JetBrains Mono', monospace;
+            background-color: #0f172a;
+            background-image: 
+                radial-gradient(circle at 15% 50%, rgba(6, 182, 212, 0.08), transparent 25%),
+                radial-gradient(circle at 85% 30%, rgba(59, 130, 246, 0.08), transparent 25%);
+        }
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.4);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(148, 163, 184, 0.1);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.3);
+        }
+        @keyframes scan {
+            0% { top: 0; opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { top: 100%; opacity: 0; }
+        }
+    </style>
+</head>
+<body class="text-slate-200 min-h-screen flex items-center justify-center p-6 relative overflow-hidden">
+    <div class="absolute inset-0 pointer-events-none" style="background-image: linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px); background-size: 32px 32px;"></div>
+
+    <main class="glass-panel rounded-2xl w-full max-w-4xl p-8 relative z-10 overflow-hidden border-t-4 border-t-cyan-500">
+        
+        <header class="flex justify-between items-center mb-10 border-b border-slate-700 pb-4">
+            <div>
+                <h1 class="text-3xl font-bold tracking-wider text-cyan-400">JEREMIA_CENTER</h1>
+                <p class="text-xs text-slate-400 mt-1 uppercase tracking-[0.2em]">IoT Visitor Capacity Monitor // Active</p>
+            </div>
+            <div class="flex items-center gap-3 bg-slate-800/50 px-4 py-2 rounded-lg border border-slate-700">
+                <span class="relative flex h-3 w-3">
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-3 w-3 bg-cyan-500"></span>
+                </span>
+                <span class="text-sm font-semibold text-cyan-400">SYSTEM ONLINE</span>
+            </div>
+        </header>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <section class="glass-panel rounded-xl p-6 flex flex-col items-center justify-center border-l-4 border-l-cyan-500 col-span-1 md:col-span-2 relative">
+                <h2 class="text-sm text-slate-400 uppercase tracking-widest absolute top-6 left-6">Current Occupancy [V0]</h2>
+                <div class="text-[6rem] font-bold text-white leading-none mt-6" id="visitor-count">0</div>
+                <div class="text-sm mt-2 text-cyan-400 flex items-center gap-2">
+                    <span class="inline-block w-2 h-2 bg-cyan-400"></span>
+                    MAX CAPACITY: <span id="max-capacity">10</span> Orang
+                </div>
+                
+                <div class="w-full bg-slate-800 h-2 rounded-full mt-8 overflow-hidden">
+                    <div id="capacity-bar" class="bg-cyan-500 h-full transition-all duration-500" style="width: 0%"></div>
+                </div>
+            </section>
+
+            <div class="flex flex-col gap-6">
+                <section class="glass-panel rounded-xl p-6 border-l-4 border-l-emerald-500 flex flex-col" id="status-card">
+                    <h2 class="text-sm text-slate-400 uppercase tracking-widest mb-4">System Status [V3]</h2>
+                    <div class="text-lg font-bold text-emerald-400 uppercase flex-grow" id="system-status">STANDBY</div>
+                    
+                    <div class="flex gap-6 mt-6 border-t border-slate-700/50 pt-4">
+                        <div class="flex flex-col items-center gap-2">
+                            <div id="led-in" class="w-5 h-5 rounded-full bg-red-900/50 border-2 border-red-500/30 transition-all duration-300"></div>
+                            <span class="text-[10px] text-slate-400 font-bold tracking-widest uppercase">Masuk (Merah)</span>
+                        </div>
+                        <div class="flex flex-col items-center gap-2">
+                            <div id="led-out" class="w-5 h-5 rounded-full bg-blue-900/50 border-2 border-blue-500/30 transition-all duration-300"></div>
+                            <span class="text-[10px] text-slate-400 font-bold tracking-widest uppercase">Keluar (Biru)</span>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="glass-panel rounded-xl p-6 flex-1 flex flex-col justify-between">
+                    <h2 class="text-sm text-slate-400 uppercase tracking-widest mb-4">Override Control [V1]</h2>
+                    <button id="btn-reset" class="w-full py-4 bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 border border-rose-500/50 rounded-lg uppercase tracking-widest font-bold transition-all hover:shadow-[0_0_15px_rgba(244,63,94,0.4)] active:scale-95">
+                        Initiate Reset
+                    </button>
+                </section>
+            </div>
+        </div>
+        <section class="glass-panel rounded-xl p-6 mt-6 border-l-4 border-l-indigo-500">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-sm text-slate-400 uppercase tracking-widest">Occupancy History Log [V2]</h2>
+                    <span class="text-[10px] bg-indigo-500/20 text-indigo-400 px-2 py-1 rounded border border-indigo-500/30">REAL-TIME</span>
+                </div>
+                <div class="relative w-full h-64">
+                    <canvas id="historyChart"></canvas>
+                </div>
+            </section>
+    </main>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+        import { getDatabase, ref, onValue, set, update } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
+
+        /**
+         * 1. Configuration Area
+         * Masukkan kredensial dari Project Settings Firebase Anda
+         */
+        const FIREBASE_CONFIG = {
+            apiKey: "API_KEY_ANDA",
+            authDomain: "PROJECT_ID.firebaseapp.com",
+            databaseURL: "https://PROJECT_ID-default-rtdb.firebaseio.com",
+            projectId: "PROJECT_ID",
+            storageBucket: "PROJECT_ID.appspot.com",
+            messagingSenderId: "SENDER_ID",
+            appId: "APP_ID"
+        };
+
+        const SYSTEM_CONFIG = {
+            MAX_CAPACITY: 10,
+            // Path referensi database (sesuaikan dengan struktur RTDB Anda)
+            DB_PATHS: {
+                COUNT: 'visitor_monitor/count',
+                STATUS: 'visitor_monitor/status',
+                RESET: 'visitor_monitor/reset_trigger'
+            }
+        };
+
+        /**
+         * 2. DOM Elements Cache & Constants
+         */
+        const elements = {
+            visitorCount: document.getElementById('visitor-count'),
+            systemStatus: document.getElementById('system-status'),
+            statusCard: document.getElementById('status-card'),
+            capacityBar: document.getElementById('capacity-bar'),
+            btnReset: document.getElementById('btn-reset'),
+            ledIn: document.getElementById('led-in'),
+            ledOut: document.getElementById('led-out')
+        };
+
+        // Memisahkan style class state LED untuk penerapan clean code
+        const LED_STATES = {
+            RED_ON: 'w-5 h-5 rounded-full bg-red-500 border-2 border-red-400 shadow-[0_0_15px_rgba(239,68,68,0.8)] transition-all duration-300',
+            RED_OFF: 'w-5 h-5 rounded-full bg-red-900/50 border-2 border-red-500/30 transition-all duration-300',
+            BLUE_ON: 'w-5 h-5 rounded-full bg-blue-500 border-2 border-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.8)] transition-all duration-300',
+            BLUE_OFF: 'w-5 h-5 rounded-full bg-blue-900/50 border-2 border-blue-500/30 transition-all duration-300'
+        };
+
+        /**
+         * 3. UI Update Handlers
+         */
+        const uiManager = {
+            updateCounter: (count) => {
+                elements.visitorCount.innerText = count;
+                
+                const percentage = Math.min((count / SYSTEM_CONFIG.MAX_CAPACITY) * 100, 100);
+                elements.capacityBar.style.width = `${percentage}%`;
+
+                if (count >= SYSTEM_CONFIG.MAX_CAPACITY) {
+                    elements.capacityBar.classList.replace('bg-cyan-500', 'bg-rose-500');
+                    elements.visitorCount.classList.add('text-rose-500');
+                } else {
+                    elements.capacityBar.classList.replace('bg-rose-500', 'bg-cyan-500');
+                    elements.visitorCount.classList.remove('text-rose-500');
+                }
+
+                // --- BARIS BARU: Catat data ke grafik ---
+                chartManager.recordData(count);
+            },
+
+            updateStatus: (status) => {
+                elements.systemStatus.innerText = status;
+                
+                // Reset card styling
+                elements.statusCard.className = 'glass-panel rounded-xl p-6 border-l-4 transition-colors duration-300 flex flex-col';
+                elements.systemStatus.className = 'text-lg font-bold uppercase transition-colors duration-300 flex-grow';
+                
+                // Default state: Kedua LED Mati (Standby)
+                let currentLedInState = LED_STATES.RED_OFF;
+                let currentLedOutState = LED_STATES.BLUE_OFF;
+
+                // Logika penerapan indikator visual
+                if (status === 'RUANGAN PENUH!') {
+                    elements.statusCard.classList.add('border-l-rose-500');
+                    elements.systemStatus.classList.add('text-rose-500');
+                } else if (status === 'ADA YANG MASUK') {
+                    elements.statusCard.classList.add('border-l-cyan-500');
+                    elements.systemStatus.classList.add('text-cyan-400');
+                    currentLedInState = LED_STATES.RED_ON; // Trigger LED Merah
+                } else if (status === 'ADA YANG KELUAR') {
+                    elements.statusCard.classList.add('border-l-cyan-500');
+                    elements.systemStatus.classList.add('text-cyan-400');
+                    currentLedOutState = LED_STATES.BLUE_ON; // Trigger LED Biru
+                } else {
+                    // STANDBY state
+                    elements.statusCard.classList.add('border-l-emerald-500');
+                    elements.systemStatus.classList.add('text-emerald-400');
+                }
+
+                // Render state LED ke DOM
+                elements.ledIn.className = currentLedInState;
+                elements.ledOut.className = currentLedOutState;
+            },
+
+            setResetButtonState: (isResetting) => {
+                elements.btnReset.disabled = isResetting;
+                elements.btnReset.innerText = isResetting ? "RESETTING..." : "INITIATE RESET";
+            }
+        };
+
+        /**
+         * 3.5 Chart Operations (Clean Code Encapsulation)
+         */
+        const chartManager = {
+            instance: null,
+            maxDataPoints: 15, // Batasi jumlah titik agar grafik tidak menumpuk
+            
+            init: () => {
+                const ctx = document.getElementById('historyChart').getContext('2d');
+                
+                // Tema Global Chart.js menyesuaikan UI Glassmorphism
+                Chart.defaults.color = '#94a3b8';
+                Chart.defaults.font.family = "'JetBrains Mono', monospace";
+                
+                chartManager.instance = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: [],
+                        datasets: [{
+                            label: 'Total Pengunjung',
+                            data: [],
+                            borderColor: '#06b6d4', // Cyan 500
+                            backgroundColor: 'rgba(6, 182, 212, 0.1)',
+                            borderWidth: 2,
+                            pointBackgroundColor: '#0f172a',
+                            pointBorderColor: '#06b6d4',
+                            pointBorderWidth: 2,
+                            pointRadius: 3,
+                            fill: true,
+                            tension: 0.3 // Membuat garis agak melengkung
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                                titleColor: '#06b6d4',
+                                bodyFont: { family: "'JetBrains Mono', monospace" }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                max: SYSTEM_CONFIG.MAX_CAPACITY + 2, // Beri jarak 2 angka di atas batas maksimal
+                                grid: { color: 'rgba(148, 163, 184, 0.1)' }
+                            },
+                            x: {
+                                grid: { display: false }
+                            }
+                        }
+                    }
+                });
+            },
+
+            recordData: (currentCount) => {
+                if (!chartManager.instance) return;
+
+                const now = new Date();
+                const timeLabel = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
+
+                const chartData = chartManager.instance.data;
+                
+                chartData.labels.push(timeLabel);
+                chartData.datasets[0].data.push(currentCount);
+
+                // Hapus data paling awal jika melebihi batas (efek sliding window)
+                if (chartData.labels.length > chartManager.maxDataPoints) {
+                    chartData.labels.shift();
+                    chartData.datasets[0].data.shift();
+                }
+
+                // Update grafik (parameter 'none' meniadakan animasi penuh agar responsif saat data berubah cepat)
+                chartManager.instance.update('none'); 
+            }
+        };
+
+        /**
+         * 4. Firebase Initialization & Core Logic
+         */
+        const app = initializeApp(FIREBASE_CONFIG);
+        const db = getDatabase(app);
+
+        function initializeDatabaseListeners() {
+            const countRef = ref(db, SYSTEM_CONFIG.DB_PATHS.COUNT);
+            const statusRef = ref(db, SYSTEM_CONFIG.DB_PATHS.STATUS);
+
+            // Real-time listener untuk jumlah pengunjung
+            onValue(countRef, (snapshot) => {
+                const data = snapshot.val();
+                if (data !== null) {
+                    uiManager.updateCounter(data);
+                }
+            }, (error) => {
+                console.error("[Firebase Error] Failed to read count:", error);
+            });
+
+            // Real-time listener untuk status ruangan
+            onValue(statusRef, (snapshot) => {
+                const data = snapshot.val();
+                if (data !== null) {
+                    uiManager.updateStatus(data);
+                }
+            }, (error) => {
+                console.error("[Firebase Error] Failed to read status:", error);
+            });
+        }
+
+        async function handleResetAction() {
+            uiManager.setResetButtonState(true);
+            
+            try {
+                // Menulis data ke Firebase secara simultan
+                const updates = {};
+                updates[SYSTEM_CONFIG.DB_PATHS.COUNT] = 0;
+                updates[SYSTEM_CONFIG.DB_PATHS.STATUS] = "STANDBY";
+                updates[SYSTEM_CONFIG.DB_PATHS.RESET] = 1; // Trigger untuk dikirim ke ESP32
+                
+                await update(ref(db), updates);
+                
+                // Kembalikan trigger reset ke 0 setelah memberi waktu ESP32 membaca
+                setTimeout(async () => {
+                    await set(ref(db, SYSTEM_CONFIG.DB_PATHS.RESET), 0);
+                    uiManager.setResetButtonState(false);
+                }, 500);
+
+            } catch (error) {
+                console.error("[Firebase Error] Reset failed:", error);
+                uiManager.setResetButtonState(false);
+            }
+        }
+
+        /**
+         * 5. Bootstrap
+         */
+        document.addEventListener('DOMContentLoaded', () => {
+            elements.btnReset.addEventListener('click', handleResetAction);
+            chartManager.init(); // Inisialisasi grafik pertama kali
+            initializeDatabaseListeners();
+            console.log("[System Log] Firebase Dashboard & Chart initialized.");
+        });
+
+    </script>
+</body>
+</html>
