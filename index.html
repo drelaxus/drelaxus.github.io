@@ -1,389 +1,594 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="id">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Jeremia Center - Tactical Monitor</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&display=swap" rel="stylesheet">
-    <style>
-        body {
-            font-family: 'JetBrains Mono', monospace;
-            background-color: #0f172a;
-            background-image: 
-                radial-gradient(circle at 15% 50%, rgba(6, 182, 212, 0.08), transparent 25%),
-                radial-gradient(circle at 85% 30%, rgba(59, 130, 246, 0.08), transparent 25%);
-        }
-        .glass-panel {
-            background: rgba(30, 41, 59, 0.4);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border: 1px solid rgba(148, 163, 184, 0.1);
-            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.3);
-        }
-        @keyframes scan {
-            0% { top: 0; opacity: 0; }
-            10% { opacity: 1; }
-            90% { opacity: 1; }
-            100% { top: 100%; opacity: 0; }
-        }
-        
-        /* Custom Scrollbar Styling */
-        ::-webkit-scrollbar {
-            width: 12px;
-        }
-        
-        ::-webkit-scrollbar-track {
-            background: rgba(30, 41, 59, 0.3);
-            border-radius: 10px;
-        }
-        
-        ::-webkit-scrollbar-thumb {
-            background: #06b6d4;
-            border-radius: 10px;
-            border: 2px solid rgba(6, 182, 212, 0.3);
-            box-shadow: 0 0 10px rgba(6, 182, 212, 0.6);
-            transition: all 0.3s ease;
-        }
-        
-        ::-webkit-scrollbar-thumb:hover {
-            background: #22d3ee;
-            box-shadow: 0 0 15px rgba(34, 211, 238, 0.8);
-            border-color: rgba(34, 211, 238, 0.5);
-        }
-        
-        /* Firefox Scrollbar */
-        * {
-            scrollbar-color: #06b6d4 rgba(30, 41, 59, 0.3);
-            scrollbar-width: thin;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard Penghitung Pengunjung</title>
+  <!-- TIDAK ADA LIBRARY EKSTERNAL — berjalan dari file:// maupun http:// -->
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --primary:#6366f1; --green:#22c55e; --red:#ef4444; --amber:#f59e0b;
+      --bg:#0f172a; --bg2:#1e293b; --bg3:#0a0e1a;
+      --border:#334155; --text:#f1f5f9; --text2:#94a3b8; --text3:#475569;
+    }
+    body { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; background:var(--bg3); color:var(--text); min-height:100vh; }
+    .header { background:linear-gradient(135deg,#0f172a,#0c1a2e); border-bottom:1px solid var(--border); padding:16px 24px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; }
+    .header-title { font-size:18px; font-weight:700; }
+    .header-sub   { font-size:11px; color:var(--text3); margin-top:2px; }
+    .conn-badge { display:flex; align-items:center; gap:6px; padding:6px 14px; border-radius:20px; font-size:12px; font-weight:600; transition:all 0.3s; }
+    .conn-badge.online  { background:#22c55e22; color:#22c55e; border:1px solid #22c55e44; }
+    .conn-badge.offline { background:#ef444422; color:#ef4444; border:1px solid #ef444444; }
+    .conn-badge.pending { background:#f59e0b22; color:#f59e0b; border:1px solid #f59e0b44; }
+    .dot { width:8px; height:8px; border-radius:50%; background:currentColor; flex-shrink:0; }
+    .dot.pulse { animation:pulse 1.5s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.4;transform:scale(0.85)} }
+    .main { padding:20px; max-width:900px; margin:0 auto; }
+    .alert { padding:16px 20px; border-radius:10px; margin-bottom:20px; display:flex; align-items:flex-start; gap:14px; }
+    .alert.normal { background:#22c55e18; border:1px solid #22c55e44; color:#22c55e; }
+    .alert.warn   { background:#f59e0b18; border:1px solid #f59e0b44; color:#f59e0b; }
+    .alert.error  { background:#ef444418; border:1px solid #ef444444; color:#ef4444; }
+    .alert.info   { background:#6366f118; border:1px solid #6366f144; color:#818cf8; }
+    .alert-icon  { font-size:22px; flex-shrink:0; }
+    .alert-title { font-size:14px; font-weight:700; margin-bottom:4px; }
+    .alert-body  { font-size:12px; opacity:0.9; line-height:1.8; }
+    .alert-body code { background:rgba(0,0,0,0.3); padding:2px 6px; border-radius:4px; font-family:monospace; font-size:11px; }
+    .stats-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-bottom:20px; }
+    @media(max-width:600px){ .stats-grid{grid-template-columns:1fr 1fr} .stat-card:last-child{grid-column:span 2} }
+    .stat-card { background:var(--bg2); border:1px solid var(--border); border-radius:12px; padding:20px; text-align:center; position:relative; overflow:hidden; transition:transform 0.2s; }
+    .stat-card:hover { transform:translateY(-2px); }
+    .stat-card::before { content:""; position:absolute; top:0; left:0; right:0; height:3px; background:var(--card-color,var(--primary)); border-radius:12px 12px 0 0; }
+    .stat-label { font-size:10px; text-transform:uppercase; letter-spacing:1.5px; color:var(--text3); margin-bottom:10px; }
+    .stat-value { font-size:42px; font-weight:800; color:var(--card-color,var(--primary)); line-height:1; margin-bottom:4px; transition:all 0.3s; }
+    .stat-value.bump { animation:bump 0.4s ease; }
+    @keyframes bump { 0%{transform:scale(1)} 50%{transform:scale(1.15)} 100%{transform:scale(1)} }
+    .stat-unit { font-size:11px; color:var(--text3); }
+    .capacity-card { background:var(--bg2); border:1px solid var(--border); border-radius:12px; padding:20px; margin-bottom:20px; }
+    .cap-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; }
+    .cap-label { font-size:13px; font-weight:600; }
+    .cap-pct { font-size:20px; font-weight:800; color:var(--primary); }
+    .bar-track { width:100%; height:20px; background:var(--bg3); border-radius:10px; overflow:hidden; }
+    .bar-fill { height:100%; width:0%; border-radius:10px; background:linear-gradient(90deg,#6366f1,#8b5cf6); transition:width 0.6s,background 0.4s; display:flex; align-items:center; justify-content:flex-end; padding-right:8px; font-size:11px; font-weight:700; color:white; }
+    .bar-fill.warn { background:linear-gradient(90deg,#f59e0b,#ef4444); }
+    .bar-fill.full { background:linear-gradient(90deg,#ef4444,#dc2626); animation:flash 1s infinite; }
+    @keyframes flash { 0%,100%{opacity:1} 50%{opacity:0.7} }
+    .bar-ticks { display:flex; justify-content:space-between; margin-top:6px; }
+    .bar-tick { font-size:9px; color:var(--text3); }
+    .meta-card { background:var(--bg2); border:1px solid var(--border); border-radius:12px; padding:16px; margin-bottom:20px; display:flex; gap:20px; flex-wrap:wrap; }
+    .meta-item { flex:1; min-width:120px; }
+    .meta-label { font-size:10px; color:var(--text3); margin-bottom:4px; text-transform:uppercase; letter-spacing:1px; }
+    .meta-value { font-size:13px; font-weight:600; color:var(--text2); }
+    .bottom-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:20px; }
+    @media(max-width:680px){ .bottom-grid{grid-template-columns:1fr} }
+    .card { background:var(--bg2); border:1px solid var(--border); border-radius:12px; overflow:hidden; }
+    .card-header { padding:14px 18px; border-bottom:1px solid var(--border); font-size:13px; font-weight:600; display:flex; align-items:center; gap:8px; }
+    .event-list { max-height:360px; overflow-y:auto; }
+    .event-list::-webkit-scrollbar { width:4px; }
+    .event-list::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
+    .event-item { display:flex; align-items:center; justify-content:space-between; padding:12px 18px; border-bottom:1px solid #1e293b; animation:fadeIn 0.3s ease; }
+    .event-item:last-child { border-bottom:none; }
+    @keyframes fadeIn { from{opacity:0;transform:translateY(-8px)} to{opacity:1;transform:translateY(0)} }
+    .event-left { display:flex; align-items:center; gap:12px; }
+    .event-badge { padding:5px 12px; border-radius:8px; font-size:11px; font-weight:700; letter-spacing:0.5px; white-space:nowrap; }
+    .badge-masuk  { background:#22c55e22; color:#22c55e; border:1px solid #22c55e44; }
+    .badge-keluar { background:#ef444422; color:#ef4444; border:1px solid #ef444444; }
+    .event-info { display:flex; flex-direction:column; gap:2px; }
+    .event-time-val { font-size:14px; font-weight:700; color:var(--text); }
+    .event-date-val { font-size:10px; color:var(--text3); }
+    .event-total  { font-size:12px; color:var(--text2); white-space:nowrap; }
+    .event-total strong { color:var(--text); }
+    .empty-state  { text-align:center; padding:32px; color:var(--text3); font-size:13px; }
+    .empty-state div { font-size:28px; margin-bottom:10px; }
+    .chart-wrap { padding:16px 18px; }
+    .chart-bars { display:flex; align-items:flex-end; gap:6px; height:100px; }
+    .chart-bar-wrap { flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; }
+    .chart-bar { width:100%; background:linear-gradient(180deg,#6366f1,#8b5cf6); border-radius:4px 4px 0 0; min-height:4px; transition:height 0.4s; }
+    .chart-bar-label { font-size:8px; color:var(--text3); }
+    .footer { text-align:center; padding:16px; font-size:11px; color:var(--text3); border-top:1px solid var(--border); }
+  </style>
 </head>
-<body class="text-slate-200 min-h-screen flex items-center justify-center p-6 relative overflow-hidden">
-    <div class="absolute inset-0 pointer-events-none" style="background-image: linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px); background-size: 32px 32px;"></div>
+<body>
 
-    <main class="glass-panel rounded-2xl w-full max-w-4xl p-8 relative z-10 overflow-y-auto max-h-[90vh] border-t-4 border-t-cyan-500">
-        
-        <header class="flex justify-between items-center mb-10 border-b border-slate-700 pb-4">
-            <div>
-                <h1 class="text-3xl font-bold tracking-wider text-cyan-400">JEREMIA_CENTER</h1>
-                <p class="text-xs text-slate-400 mt-1 uppercase tracking-[0.2em]">IoT Visitor Capacity Monitor // Active</p>
-            </div>
-            <div class="flex items-center gap-3 bg-slate-800/50 px-4 py-2 rounded-lg border border-slate-700">
-                <span class="relative flex h-3 w-3">
-                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
-                    <span class="relative inline-flex rounded-full h-3 w-3 bg-cyan-500"></span>
-                </span>
-                <span class="text-sm font-semibold text-cyan-400">SYSTEM ONLINE</span>
-            </div>
-        </header>
+<script>
+  /* ═══════════════════════════════════════
+     KONFIGURASI — sudah diisi
+  ═══════════════════════════════════════ */
+  var DB_URL     = "https://iot-pengunjung-cc240-default-rtdb.asia-southeast1.firebasedatabase.app";
+  var MAX_CAP    = 10;    // samakan dengan MAX_PENGUNJUNG di Arduino
+  var POLL_MS    = 2000;  // interval refresh (ms)
+</script>
 
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <section class="glass-panel rounded-xl p-6 flex flex-col items-center justify-center border-l-4 border-l-cyan-500 col-span-1 md:col-span-2 relative">
-                <h2 class="text-sm text-slate-400 uppercase tracking-widest absolute top-6 left-6">Current Occupancy [V0]</h2>
-                <div class="text-[6rem] font-bold text-white leading-none mt-6" id="visitor-count">0</div>
-                <div class="text-sm mt-2 text-cyan-400 flex items-center gap-2">
-                    <span class="inline-block w-2 h-2 bg-cyan-400"></span>
-                    MAX CAPACITY: <span id="max-capacity">10</span> Orang
-                </div>
-                
-                <div class="w-full bg-slate-800 h-2 rounded-full mt-8 overflow-hidden">
-                    <div id="capacity-bar" class="bg-cyan-500 h-full transition-all duration-500" style="width: 0%"></div>
-                </div>
-            </section>
+<!-- HEADER -->
+<div class="header">
+  <div>
+    <div class="header-title">📊 Dashboard Penghitung Pengunjung</div>
+    <div class="header-sub">iot-pengunjung-cc240 · Kapasitas: <span id="hdrMaks">10</span> orang · Refresh tiap 2 detik</div>
+  </div>
+  <div class="conn-badge pending" id="connBadge">
+    <div class="dot pulse" id="connDot"></div>
+    <span id="connText">Menghubungkan...</span>
+  </div>
+</div>
 
-            <div class="flex flex-col gap-6">
-                <section class="glass-panel rounded-xl p-6 border-l-4 border-l-emerald-500 flex flex-col" id="status-card">
-                    <h2 class="text-sm text-slate-400 uppercase tracking-widest mb-4">System Status [V3]</h2>
-                    <div class="text-lg font-bold text-emerald-400 uppercase flex-grow" id="system-status">STANDBY</div>
-                    
-                    <div class="flex gap-6 mt-6 border-t border-slate-700/50 pt-4">
-                        <div class="flex flex-col items-center gap-2">
-                            <div id="led-in" class="w-5 h-5 rounded-full bg-red-900/50 border-2 border-red-500/30 transition-all duration-300"></div>
-                            <span class="text-[10px] text-slate-400 font-bold tracking-widest uppercase">Masuk (Merah)</span>
-                        </div>
-                        <div class="flex flex-col items-center gap-2">
-                            <div id="led-out" class="w-5 h-5 rounded-full bg-blue-900/50 border-2 border-blue-500/30 transition-all duration-300"></div>
-                            <span class="text-[10px] text-slate-400 font-bold tracking-widest uppercase">Keluar (Biru)</span>
-                        </div>
-                    </div>
-                </section>
+<div class="main">
+  <div id="alertArea">
+    <div class="alert info">
+      <div class="alert-icon">🔵</div>
+      <div>
+        <div class="alert-title">Menghubungkan ke Firebase...</div>
+        <div class="alert-body">Pastikan internet aktif. Menggunakan metode JSONP — bisa dibuka langsung dari file.</div>
+      </div>
+    </div>
+  </div>
 
-                <section class="glass-panel rounded-xl p-6 flex-1 flex flex-col justify-between">
-                    <h2 class="text-sm text-slate-400 uppercase tracking-widest mb-4">Override Control [V1]</h2>
-                    <button id="btn-reset" class="w-full py-4 bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 border border-rose-500/50 rounded-lg uppercase tracking-widest font-bold transition-all hover:shadow-[0_0_15px_rgba(244,63,94,0.4)] active:scale-95">
-                        Initiate Reset
-                    </button>
-                </section>
-            </div>
+  <div class="stats-grid">
+    <div class="stat-card" style="--card-color:#6366f1">
+      <div class="stat-label">Pengunjung Sekarang</div>
+      <div class="stat-value" id="valJumlah">—</div>
+      <div class="stat-unit">orang</div>
+    </div>
+    <div class="stat-card" style="--card-color:#22c55e">
+      <div class="stat-label">Sisa Kapasitas</div>
+      <div class="stat-value" id="valSisa">—</div>
+      <div class="stat-unit">slot tersedia</div>
+    </div>
+    <div class="stat-card" style="--card-color:#f59e0b">
+      <div class="stat-label">Total Masuk</div>
+      <div class="stat-value" id="valTotal">0</div>
+      <div class="stat-unit">kunjungan</div>
+    </div>
+  </div>
+
+  <div class="capacity-card">
+    <div class="cap-header">
+      <div class="cap-label">📊 Tingkat Kepadatan Ruangan</div>
+      <div class="cap-pct" id="valPct">0%</div>
+    </div>
+    <div class="bar-track"><div class="bar-fill" id="barFill"></div></div>
+    <div class="bar-ticks">
+      <span class="bar-tick">0%</span><span class="bar-tick">25%</span>
+      <span class="bar-tick">50%</span><span class="bar-tick">75%</span>
+      <span class="bar-tick">Penuh</span>
+    </div>
+  </div>
+
+  <div class="meta-card">
+    <div class="meta-item">
+      <div class="meta-label">Kapasitas Maksimal</div>
+      <div class="meta-value" id="metaMaks">10 orang</div>
+    </div>
+    <div class="meta-item">
+      <div class="meta-label">Update Terakhir</div>
+      <div class="meta-value" id="metaUpdate">—</div>
+    </div>
+    <div class="meta-item">
+      <div class="meta-label">Total Event</div>
+      <div class="meta-value" id="metaEvents">0 event</div>
+    </div>
+    <div class="meta-item">
+      <div class="meta-label">Metode</div>
+      <div class="meta-value">JSONP (file:// friendly)</div>
+    </div>
+  </div>
+
+  <div class="bottom-grid">
+    <div class="card">
+      <div class="card-header">
+        📝 Event Log
+        <span style="font-size:10px;color:var(--text3);margin-left:auto" id="logCount"></span>
+        <span style="font-size:10px;color:#ef4444;margin-left:8px" id="evStatus"></span>
+        <button id="btnReset" onclick="resetLog()"
+          style="margin-left:10px;padding:3px 10px;border-radius:6px;border:1px solid #ef444444;
+                 background:#ef444418;color:#ef4444;font-size:10px;font-weight:700;cursor:pointer;
+                 transition:background 0.2s"
+          onmouseover="this.style.background='#ef444433'"
+          onmouseout="this.style.background='#ef444418'">
+          🗑 Reset
+        </button>
+      </div>
+      <div class="event-list" id="eventList">
+        <div class="empty-state"><div>📋</div>Menunggu event...</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header">📈 Pengunjung Masuk per Jam</div>
+      <div class="chart-wrap">
+        <div class="chart-bars" id="chartBars"></div>
+        <div style="font-size:10px;color:var(--text3);text-align:center;margin-top:10px">
+          8 jam terakhir · update otomatis
         </div>
-        <section class="glass-panel rounded-xl p-6 mt-6 border-l-4 border-l-indigo-500">
-                <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-sm text-slate-400 uppercase tracking-widest">Occupancy History Log [V2]</h2>
-                    <span class="text-[10px] bg-indigo-500/20 text-indigo-400 px-2 py-1 rounded border border-indigo-500/30">REAL-TIME</span>
-                </div>
-                <div class="relative w-full h-64">
-                    <canvas id="historyChart"></canvas>
-                </div>
-            </section>
-    </main>
+      </div>
+    </div>
+  </div>
+</div>
 
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-        import { getDatabase, ref, onValue, set, update } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
+<div class="footer">
+  Dashboard Penghitung Pengunjung · ESP32 + Firebase · JSONP Mode
+</div>
 
-        /**
-         * 1. Configuration Area
-         * Masukkan kredensial dari Project Settings Firebase Anda
-         */
-        const FIREBASE_CONFIG = {
-            apiKey: "API_KEY_ANDA",
-            authDomain: "PROJECT_ID.firebaseapp.com",
-            databaseURL: "https://PROJECT_ID-default-rtdb.firebaseio.com",
-            projectId: "PROJECT_ID",
-            storageBucket: "PROJECT_ID.appspot.com",
-            messagingSenderId: "SENDER_ID",
-            appId: "APP_ID"
-        };
+<script>
+  // ── State ────────────────────────────────────────
+  var eventCache    = {};
+  var eventKeys     = [];
+  var receivedAt    = {};   // wall-clock time when dashboard first saw each event key
+  var hourlyData    = [0,0,0,0,0,0,0,0];
+  var totalMasuk    = 0;
+  var prevJumlah    = -1;   // jumlah terakhir dari visitor_counter, untuk deteksi kenaikan
+  var failCount     = 0;
+  var firstData     = false;
+  var evInFlight    = false;  // guard: satu request events sekaligus
+  var evEscapeTimer = null;   // escape valve jika callback tidak pernah terpanggil
 
-        const SYSTEM_CONFIG = {
-            MAX_CAPACITY: 10,
-            // Path referensi database (sesuaikan dengan struktur RTDB Anda)
-            DB_PATHS: {
-                COUNT: 'visitor_monitor/count',
-                STATUS: 'visitor_monitor/status',
-                RESET: 'visitor_monitor/reset_trigger'
-            }
-        };
+  document.getElementById("hdrMaks").textContent  = MAX_CAP;
+  document.getElementById("metaMaks").textContent = MAX_CAP + " orang";
 
-        /**
-         * 2. DOM Elements Cache & Constants
-         */
-        const elements = {
-            visitorCount: document.getElementById('visitor-count'),
-            systemStatus: document.getElementById('system-status'),
-            statusCard: document.getElementById('status-card'),
-            capacityBar: document.getElementById('capacity-bar'),
-            btnReset: document.getElementById('btn-reset'),
-            ledIn: document.getElementById('led-in'),
-            ledOut: document.getElementById('led-out')
-        };
+  // ── Helpers ──────────────────────────────────────
+  function setAlert(type, icon, title, body) {
+    document.getElementById("alertArea").innerHTML =
+      '<div class="alert ' + type + '">' +
+        '<div class="alert-icon">' + icon + '</div>' +
+        '<div><div class="alert-title">' + title + '</div>' +
+            '<div class="alert-body">' + body + '</div></div>' +
+      '</div>';
+  }
 
-        // Memisahkan style class state LED untuk penerapan clean code
-        const LED_STATES = {
-            RED_ON: 'w-5 h-5 rounded-full bg-red-500 border-2 border-red-400 shadow-[0_0_15px_rgba(239,68,68,0.8)] transition-all duration-300',
-            RED_OFF: 'w-5 h-5 rounded-full bg-red-900/50 border-2 border-red-500/30 transition-all duration-300',
-            BLUE_ON: 'w-5 h-5 rounded-full bg-blue-500 border-2 border-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.8)] transition-all duration-300',
-            BLUE_OFF: 'w-5 h-5 rounded-full bg-blue-900/50 border-2 border-blue-500/30 transition-all duration-300'
-        };
+  function setConn(state, label) {
+    document.getElementById("connBadge").className = "conn-badge " + state;
+    document.getElementById("connText").textContent = label;
+    document.getElementById("connDot").className =
+      "dot" + (state === "pending" ? " pulse" : "");
+  }
 
-        /**
-         * 3. UI Update Handlers
-         */
-        const uiManager = {
-            updateCounter: (count) => {
-                elements.visitorCount.innerText = count;
-                
-                const percentage = Math.min((count / SYSTEM_CONFIG.MAX_CAPACITY) * 100, 100);
-                elements.capacityBar.style.width = `${percentage}%`;
+  function animVal(id, val) {
+    var el = document.getElementById(id);
+    var s  = String(val);
+    if (el.textContent !== s) {
+      el.classList.remove("bump");
+      void el.offsetWidth;
+      el.classList.add("bump");
+    }
+    el.textContent = s;
+  }
 
-                if (count >= SYSTEM_CONFIG.MAX_CAPACITY) {
-                    elements.capacityBar.classList.replace('bg-cyan-500', 'bg-rose-500');
-                    elements.visitorCount.classList.add('text-rose-500');
-                } else {
-                    elements.capacityBar.classList.replace('bg-rose-500', 'bg-cyan-500');
-                    elements.visitorCount.classList.remove('text-rose-500');
-                }
+  // ── JSONP helper ─────────────────────────────────
+  // Firebase REST API mendukung ?callback=nama
+  // Metode ini bekerja dari file://, http://, maupun https://
+  function jsonpFetch(url, onSuccess, onError) {
+    var cbName  = "_fb_" + Date.now() + "_" + Math.floor(Math.random() * 9999);
+    var script  = document.createElement("script");
+    var timeout = setTimeout(function() {
+      cleanup();
+      if (onError) onError(new Error("Timeout"));
+    }, 8000);
 
-                // --- BARIS BARU: Catat data ke grafik ---
-                chartManager.recordData(count);
-            },
+    function cleanup() {
+      clearTimeout(timeout);
+      delete window[cbName];
+      if (script.parentNode) script.parentNode.removeChild(script);
+    }
 
-            updateStatus: (status) => {
-                elements.systemStatus.innerText = status;
-                
-                // Reset card styling
-                elements.statusCard.className = 'glass-panel rounded-xl p-6 border-l-4 transition-colors duration-300 flex flex-col';
-                elements.systemStatus.className = 'text-lg font-bold uppercase transition-colors duration-300 flex-grow';
-                
-                // Default state: Kedua LED Mati (Standby)
-                let currentLedInState = LED_STATES.RED_OFF;
-                let currentLedOutState = LED_STATES.BLUE_OFF;
+    window[cbName] = function(data) {
+      cleanup();
+      onSuccess(data);
+    };
 
-                // Logika penerapan indikator visual
-                if (status === 'RUANGAN PENUH!') {
-                    elements.statusCard.classList.add('border-l-rose-500');
-                    elements.systemStatus.classList.add('text-rose-500');
-                } else if (status === 'ADA YANG MASUK') {
-                    elements.statusCard.classList.add('border-l-cyan-500');
-                    elements.systemStatus.classList.add('text-cyan-400');
-                    currentLedInState = LED_STATES.RED_ON; // Trigger LED Merah
-                } else if (status === 'ADA YANG KELUAR') {
-                    elements.statusCard.classList.add('border-l-cyan-500');
-                    elements.systemStatus.classList.add('text-cyan-400');
-                    currentLedOutState = LED_STATES.BLUE_ON; // Trigger LED Biru
-                } else {
-                    // STANDBY state
-                    elements.statusCard.classList.add('border-l-emerald-500');
-                    elements.systemStatus.classList.add('text-emerald-400');
-                }
+    script.onerror = function() {
+      cleanup();
+      if (onError) onError(new Error("Script load failed"));
+    };
 
-                // Render state LED ke DOM
-                elements.ledIn.className = currentLedInState;
-                elements.ledOut.className = currentLedOutState;
-            },
+    var sep = url.indexOf("?") >= 0 ? "&" : "?";
+    var cacheBust = "_ts=" + Date.now() + "_" + Math.floor(Math.random() * 9999);
+    script.src = url + sep + "callback=" + cbName + "&" + cacheBust;
+    document.head.appendChild(script);
+  }
 
-            setResetButtonState: (isResetting) => {
-                elements.btnReset.disabled = isResetting;
-                elements.btnReset.innerText = isResetting ? "RESETTING..." : "INITIATE RESET";
-            }
-        };
+  // ── Render chart ─────────────────────────────────
+  function renderChart() {
+    var maxVal = Math.max.apply(null, hourlyData.concat([1]));
+    var now    = new Date();
+    document.getElementById("chartBars").innerHTML = hourlyData.map(function(v, i) {
+      var h   = (now.getHours() - (7 - i) + 24) % 24;
+      var pct = Math.round((v / maxVal) * 100);
+      return '<div class="chart-bar-wrap">' +
+        '<div style="font-size:9px;color:#6366f1;margin-bottom:2px">' + (v || "") + '</div>' +
+        '<div class="chart-bar" style="height:' + Math.max(pct, 4) + '%;"></div>' +
+        '<div class="chart-bar-label">' + String(h).padStart(2,"0") + ':00</div>' +
+      '</div>';
+    }).join("");
+  }
 
-        /**
-         * 3.5 Chart Operations (Clean Code Encapsulation)
-         */
-        const chartManager = {
-            instance: null,
-            maxDataPoints: 15, // Batasi jumlah titik agar grafik tidak menumpuk
-            
-            init: () => {
-                const ctx = document.getElementById('historyChart').getContext('2d');
-                
-                // Tema Global Chart.js menyesuaikan UI Glassmorphism
-                Chart.defaults.color = '#94a3b8';
-                Chart.defaults.font.family = "'JetBrains Mono', monospace";
-                
-                chartManager.instance = new Chart(ctx, {
-                    type: 'line',
-                    data: {
-                        labels: [],
-                        datasets: [{
-                            label: 'Total Pengunjung',
-                            data: [],
-                            borderColor: '#06b6d4', // Cyan 500
-                            backgroundColor: 'rgba(6, 182, 212, 0.1)',
-                            borderWidth: 2,
-                            pointBackgroundColor: '#0f172a',
-                            pointBorderColor: '#06b6d4',
-                            pointBorderWidth: 2,
-                            pointRadius: 3,
-                            fill: true,
-                            tension: 0.3 // Membuat garis agak melengkung
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: { display: false },
-                            tooltip: {
-                                backgroundColor: 'rgba(15, 23, 42, 0.9)',
-                                titleColor: '#06b6d4',
-                                bodyFont: { family: "'JetBrains Mono', monospace" }
-                            }
-                        },
-                        scales: {
-                            y: {
-                                beginAtZero: true,
-                                max: SYSTEM_CONFIG.MAX_CAPACITY + 2, // Beri jarak 2 angka di atas batas maksimal
-                                grid: { color: 'rgba(148, 163, 184, 0.1)' }
-                            },
-                            x: {
-                                grid: { display: false }
-                            }
-                        }
-                    }
-                });
-            },
+  // ── Decode Firebase push key → milliseconds since epoch ──
+  // Push key: 20 chars, first 8 chars = 48-bit timestamp (big-endian, base64 custom)
+  var PUSH_CHARS = '-0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz';
+  function pushKeyToMs(k) {
+    if (typeof k !== 'string' || k.length < 8) return 0;
+    var ms = 0;
+    for (var i = 0; i < 8; i++) {
+      var idx = PUSH_CHARS.indexOf(k.charAt(i));
+      if (idx === -1) return 0;
+      ms = ms * 64 + idx;
+    }
+    // Sanity check: must be between 2015 and 2100
+    return (ms > 1420000000000 && ms < 4102444800000) ? ms : 0;
+  }
 
-            recordData: (currentCount) => {
-                if (!chartManager.instance) return;
+  // ── Resolve timestamp (ms) from event data or key ──
+  function resolveTs(k, e) {
+    // 1. Numeric fields in event data
+    var fields = [e.timestamp, e.waktu, e.ts, e.time, e.epoch];
+    for (var i = 0; i < fields.length; i++) {
+      var v = fields[i];
+      if (typeof v === 'number' && v > 1000000000)
+        return v > 9999999999 ? v : v * 1000;
+    }
+    // 2. Key as numeric timestamp
+    var n = parseInt(k);
+    if (n > 1000000000000) return n;
+    if (n > 1000000000)    return n * 1000;
+    // 3. Firebase push key (e.g. "-OQ7abcXXXXXXXXXXXX")
+    return pushKeyToMs(k);
+  }
 
-                const now = new Date();
-                const timeLabel = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
+  // Returns time string — prefers string field, then decoded timestamp, then receivedAt
+  function resolveTimeStr(k, e) {
+    var strFields = [e.waktu, e.time, e.jam];
+    for (var i = 0; i < strFields.length; i++) {
+      var v = strFields[i];
+      if (typeof v === 'string' && v.trim().length > 0) return v.trim();
+    }
+    var ts = resolveTs(k, e);
+    if (ts > 0) return new Date(ts).toLocaleTimeString("id-ID");
+    if (receivedAt[k]) return receivedAt[k].toLocaleTimeString("id-ID");
+    return "—";
+  }
 
-                const chartData = chartManager.instance.data;
-                
-                chartData.labels.push(timeLabel);
-                chartData.datasets[0].data.push(currentCount);
+  function resolveDateStr(k, e) {
+    var ts = resolveTs(k, e);
+    if (ts > 0) return new Date(ts).toLocaleDateString("id-ID", {day:"numeric", month:"short", year:"numeric"});
+    if (receivedAt[k]) return receivedAt[k].toLocaleDateString("id-ID", {day:"numeric", month:"short", year:"numeric"});
+    return "—";
+  }
 
-                // Hapus data paling awal jika melebihi batas (efek sliding window)
-                if (chartData.labels.length > chartManager.maxDataPoints) {
-                    chartData.labels.shift();
-                    chartData.datasets[0].data.shift();
-                }
+  // ── Render events ─────────────────────────────────
+  function renderEvents() {
+    var list = document.getElementById("eventList");
+    document.getElementById("logCount").textContent = eventKeys.length + " event";
+    if (!eventKeys.length) {
+      list.innerHTML = '<div class="empty-state"><div>📋</div>Belum ada aktivitas</div>';
+      return;
+    }
+    list.innerHTML = eventKeys.slice(0, 40).map(function(k) {
+      var e = eventCache[k];
+      if (!e || typeof e !== 'object') return '';
+      var isMsk = typeof e.tipe === 'string' && e.tipe.toUpperCase() === "MASUK";
+      return '<div class="event-item">' +
+        '<div class="event-left">' +
+          '<span class="event-badge ' + (isMsk ? "badge-masuk" : "badge-keluar") + '">' +
+            (isMsk ? "↑ MASUK" : "↓ KELUAR") + '</span>' +
+          '<div class="event-info">' +
+            '<span class="event-time-val">' + resolveTimeStr(k, e) + '</span>' +
+            '<span class="event-date-val">' + resolveDateStr(k, e) + '</span>' +
+          '</div>' +
+        '</div>' +
+        '<span class="event-total">Total: <strong>' +
+          (e.total !== undefined ? e.total : (e.jumlah !== undefined ? e.jumlah : "—")) +
+        '</strong> orang</span>' +
+      '</div>';
+    }).join("");
+  }
 
-                // Update grafik (parameter 'none' meniadakan animasi penuh agar responsif saat data berubah cepat)
-                chartManager.instance.update('none'); 
-            }
-        };
+  // ── Update UI utama ───────────────────────────────
+  function updateUI(d) {
+    var jumlah = d.jumlah  !== undefined ? d.jumlah : 0;
+    var sisa   = d.sisa    !== undefined ? d.sisa   : (MAX_CAP - jumlah);
+    var ts     = d.last_update || null;
+    var pct    = Math.min(100, Math.round((jumlah / MAX_CAP) * 100));
+    var status = d.status  || (pct >= 100 ? "PENUH" : "NORMAL");
 
-        /**
-         * 4. Firebase Initialization & Core Logic
-         */
-        const app = initializeApp(FIREBASE_CONFIG);
-        const db = getDatabase(app);
+    animVal("valJumlah", jumlah);
+    animVal("valSisa",   sisa);
+    document.getElementById("valPct").textContent = pct + "%";
+    if (ts) document.getElementById("metaUpdate").textContent =
+      new Date(ts * 1000).toLocaleTimeString("id-ID");
 
-        function initializeDatabaseListeners() {
-            const countRef = ref(db, SYSTEM_CONFIG.DB_PATHS.COUNT);
-            const statusRef = ref(db, SYSTEM_CONFIG.DB_PATHS.STATUS);
+    var bar = document.getElementById("barFill");
+    bar.style.width = pct + "%";
+    bar.textContent = pct > 18 ? pct + "%" : "";
+    bar.className   = "bar-fill" + (pct >= 100 ? " full" : pct >= 75 ? " warn" : "");
 
-            // Real-time listener untuk jumlah pengunjung
-            onValue(countRef, (snapshot) => {
-                const data = snapshot.val();
-                if (data !== null) {
-                    uiManager.updateCounter(data);
-                }
-            }, (error) => {
-                console.error("[Firebase Error] Failed to read count:", error);
-            });
+    if (pct >= 100 || status === "PENUH") {
+      setAlert("error","🔴","PENUH — Tidak boleh masuk lagi!",
+        "Kapasitas sudah penuh: " + jumlah + "/" + MAX_CAP + " orang.");
+    } else if (pct >= 75) {
+      setAlert("warn","🟡","HAMPIR PENUH — Perhatikan kapasitas!",
+        "Sisa " + sisa + " slot lagi sebelum penuh.");
+    } else {
+      setAlert("normal","🟢","NORMAL — Ruangan masih tersedia",
+        "Terisi " + jumlah + " dari " + MAX_CAP + " kapasitas (" + pct + "%).");
+    }
+  }
 
-            // Real-time listener untuk status ruangan
-            onValue(statusRef, (snapshot) => {
-                const data = snapshot.val();
-                if (data !== null) {
-                    uiManager.updateStatus(data);
-                }
-            }, (error) => {
-                console.error("[Firebase Error] Failed to read status:", error);
-            });
+  // ── Fetch /visitor_counter ────────────────────────
+  function fetchMain() {
+    jsonpFetch(
+      DB_URL + "/visitor_counter.json",
+      function(data) {
+        failCount = 0;
+        setConn("online", "Terhubung ✓");
+
+        if (!data) {
+          if (!firstData) {
+            setAlert("info","🔵",
+              "Firebase terhubung! Menunggu data ESP32...",
+              "Database berhasil diakses. Nyalakan ESP32 dan pastikan kode Arduino sudah diupload.");
+          }
+          return;
         }
+        firstData = true;
+        if (data && data.max_pengunjung) MAX_CAP = data.max_pengunjung;
+        updateUI(data);
 
-        async function handleResetAction() {
-            uiManager.setResetButtonState(true);
-            
-            try {
-                // Menulis data ke Firebase secara simultan
-                const updates = {};
-                updates[SYSTEM_CONFIG.DB_PATHS.COUNT] = 0;
-                updates[SYSTEM_CONFIG.DB_PATHS.STATUS] = "STANDBY";
-                updates[SYSTEM_CONFIG.DB_PATHS.RESET] = 1; // Trigger untuk dikirim ke ESP32
-                
-                await update(ref(db), updates);
-                
-                // Kembalikan trigger reset ke 0 setelah memberi waktu ESP32 membaca
-                setTimeout(async () => {
-                    await set(ref(db, SYSTEM_CONFIG.DB_PATHS.RESET), 0);
-                    uiManager.setResetButtonState(false);
-                }, 500);
-
-            } catch (error) {
-                console.error("[Firebase Error] Reset failed:", error);
-                uiManager.setResetButtonState(false);
-            }
+        // Hitung total masuk dari kenaikan jumlah (bukan dari events)
+        var jumlah = data.jumlah !== undefined ? data.jumlah : 0;
+        if (prevJumlah >= 0 && jumlah > prevJumlah) {
+          totalMasuk += jumlah - prevJumlah;
+          animVal("valTotal", totalMasuk);
         }
+        prevJumlah = jumlah;
 
-        /**
-         * 5. Bootstrap
-         */
-        document.addEventListener('DOMContentLoaded', () => {
-            elements.btnReset.addEventListener('click', handleResetAction);
-            chartManager.init(); // Inisialisasi grafik pertama kali
-            initializeDatabaseListeners();
-            console.log("[System Log] Firebase Dashboard & Chart initialized.");
+        document.getElementById("metaUpdate").textContent =
+          new Date().toLocaleTimeString("id-ID");
+      },
+      function(err) {
+        failCount++;
+        setConn("offline", "Gagal terhubung");
+        if (failCount >= 2) {
+          setAlert("error","🔴","Tidak bisa terhubung ke Firebase",
+            "Kemungkinan penyebab:" +
+            "<br>① Koneksi internet tidak aktif" +
+            "<br>② Database Rules masih terkunci — ubah <code>.read</code> ke <code>true</code> di Firebase Console" +
+            "<br>③ URL database salah: <code>" + DB_URL + "</code>" +
+            "<br><br>Error: <code>" + err.message + "</code>"
+          );
+        }
+      }
+    );
+  }
+
+  // ── Fetch /events — JSONP, satu request sekaligus ────
+  function fetchEvents() {
+    if (evInFlight) return;               // request sebelumnya belum selesai — skip
+    evInFlight = true;
+    clearTimeout(evEscapeTimer);
+    evEscapeTimer = setTimeout(function() { evInFlight = false; }, 9000); // escape jika callback macet
+
+    jsonpFetch(
+      DB_URL + '/' + EVENTS_PATH + '.json',
+      function(data) {
+        evInFlight = false;               // reset PERTAMA sebelum apapun
+        clearTimeout(evEscapeTimer);
+        // ── DEBUG: tampilkan apa yg diterima dari Firebase ──
+        var dbg = document.getElementById("evStatus");
+        if (data === null || data === undefined) {
+          dbg.style.color = "#f59e0b";
+          dbg.textContent = "Firebase: /events kosong";
+          eventCache = {}; eventKeys = []; hourlyData = [0,0,0,0,0,0,0,0];
+          renderChart(); renderEvents();
+          document.getElementById("metaEvents").textContent = "0 event";
+          return;
+        }
+        var rawKeys = Object.keys(typeof data === 'object' ? data : {});
+        dbg.style.color = "#22c55e";
+        dbg.textContent = "Firebase: " + rawKeys.length + " key diterima";
+
+        // Normalisasi: array / object → plain object
+        var src = Array.isArray(data) ? Object.assign({}, data) : data;
+        if (typeof src !== 'object') { dbg.textContent = "⚠ format data tidak dikenal"; return; }
+
+        // Catat waktu penerimaan untuk setiap key baru (dipakai sebagai fallback waktu tampilan)
+        var now = new Date();
+        Object.keys(src).forEach(function(k) {
+          if (!receivedAt[k]) receivedAt[k] = now;
         });
 
-    </script>
+        eventCache = src;
+
+        // Hitung hourlyData untuk chart (totalMasuk ditangani di fetchMain)
+        hourlyData = [0,0,0,0,0,0,0,0];
+        var nowHr = new Date().getHours();
+        Object.keys(src).forEach(function(k) {
+          var ev = src[k];
+          if (!ev || typeof ev !== 'object') return;
+          var tipe = (typeof ev.tipe === 'string' ? ev.tipe : '').toUpperCase();
+          if (tipe === 'MASUK') {
+            var ts = resolveTs(k, ev);
+            if (ts === 0 && receivedAt[k]) ts = receivedAt[k].getTime();
+            var evHr = ts > 0 ? new Date(ts).getHours() : nowHr;
+            for (var i = 0; i < 8; i++) {
+              if ((nowHr - (7 - i) + 24) % 24 === evHr) { hourlyData[i]++; break; }
+            }
+          }
+        });
+
+        eventKeys = Object.keys(src)
+          .filter(function(k) { return src[k] && typeof src[k] === 'object'; })
+          .sort().reverse().slice(0, 50);
+
+        renderChart();
+        renderEvents();
+        document.getElementById("metaEvents").textContent = eventKeys.length + " event";
+      },
+      function(err) {
+        var dbg = document.getElementById("evStatus");
+        dbg.style.color = "#ef4444";
+        dbg.textContent = "⚠ JSONP gagal: " + (err && err.message ? err.message : "error");
+      }
+    );
+  }
+
+  // ── Reset log — hapus /events di Firebase ─────────
+  function resetLog() {
+    if (!confirm("Hapus semua data event log dari Firebase?\nTindakan ini tidak bisa dibatalkan.")) return;
+    var btn = document.getElementById("btnReset");
+    btn.textContent = "⏳ Menghapus...";
+    btn.disabled = true;
+    fetch(DB_URL + "/" + EVENTS_PATH + ".json", { method: "DELETE" })
+      .then(function(res) {
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        eventCache = {}; eventKeys = []; receivedAt = {};
+        totalMasuk = 0; prevJumlah = -1; hourlyData = [0,0,0,0,0,0,0,0];
+        animVal("valTotal", 0);
+        document.getElementById("metaEvents").textContent = "0 event";
+        renderChart(); renderEvents();
+        btn.textContent = "🗑 Reset";
+        btn.disabled = false;
+      })
+      .catch(function(err) {
+        alert("Gagal menghapus data: " + err.message);
+        btn.textContent = "🗑 Reset";
+        btn.disabled = false;
+      });
+  }
+
+  // ── Deteksi path database Firebase (satu kali) ───────
+  var EVENTS_PATH = 'events'; // default, bisa berubah setelah deteksi
+
+  function detectPaths() {
+    jsonpFetch(DB_URL + '/.json?shallow=true', function(data) {
+      var dbg = document.getElementById("evStatus");
+      if (!data || typeof data !== 'object') {
+        dbg.style.color = "#f59e0b";
+        dbg.textContent = "⚠ Tidak bisa baca root Firebase";
+        return;
+      }
+      var paths = Object.keys(data);
+      dbg.style.color = "#818cf8";
+      dbg.textContent = "Path: [" + paths.join(', ') + "]";
+
+      // Pilih path events: prioritaskan 'events', lalu cari kandidat lain
+      var known = ['visitor_counter'];
+      var candidates = paths.filter(function(p) {
+        return known.indexOf(p) === -1;
+      });
+      if (candidates.length > 0 && paths.indexOf('events') === -1) {
+        // /events tidak ada — pakai kandidat pertama sebagai path event
+        EVENTS_PATH = candidates[0];
+        dbg.textContent += "  →  pakai '" + EVENTS_PATH + "' sebagai log";
+      }
+    }, function() {});
+  }
+
+  // ── Main loop ─────────────────────────────────────
+  function tick() {
+    fetchMain();
+    fetchEvents();
+  }
+
+  renderChart();
+  detectPaths();   // sekali saja saat load
+  tick();
+  setInterval(tick, POLL_MS);
+</script>
 </body>
-</html>
+</html>>
